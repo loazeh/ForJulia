@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint-test:
+    name: lint-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check .
+      - run: pytest -v
+
+  build-scan-push:
+    name: build-scan-push
+    needs: lint-test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: ghcr.io/loazeh/forjulia
+    steps:
+      - uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a
+        with:
+          persist-credentials: false
+      - name: Build image
+        run: docker build --label org.opencontainers.image.source=https://github.com/loazeh/ForJulia --label org.opencontainers.image.revision=$GITHUB_SHA -t "$IMAGE:$GITHUB_SHA" .
+      - name: Trivy vulnerability gate
+        uses: aquasecurity/trivy-action@8f28faec26515256b6d22074d1d2a8986f4cbd87
+        with:
+          image-ref: ghcr.io/loazeh/forjulia:${{ github.sha }}
+          version: v0.76.1
+          scanners: vuln
+          format: table
+          exit-code: '1'
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+      - name: Container smoke test
+        run: |
+          docker run -d --name smoke -p 127.0.0.1:8000:8000 "$IMAGE:$GITHUB_SHA"
+          trap 'docker logs smoke; docker rm -f smoke' EXIT
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/health; then break; fi
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:8000/health
+          curl -fsS -H 'Content-Type: application/json' --data @sample_request.json http://127.0.0.1:8000/predict | python -c 'import json,sys; assert json.load(sys.stdin) == {"churn_probability": 0.895}'
+          test "$(docker exec smoke id -u)" = 10001
+      - name: Publish SHA-tagged image to GHCR
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker push "$IMAGE:$GITHUB_SHA"
+          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' "$IMAGE:$GITHUB_SHA")
+          echo "### Published image" >> "$GITHUB_STEP_SUMMARY"
+          echo "SHA tag: $IMAGE:$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+          echo "Digest: $DIGEST" >> "$GITHUB_STEP_SUMMARY"
