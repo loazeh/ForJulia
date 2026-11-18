@@ -1,0 +1,15 @@
+services:
+  api:
+    image: forjulia-lab3:${GIT_SHA:?Set GIT_SHA to the source commit}
+    build:
+      context: .
+      dockerfile: Dockerfile.deploy
+      args:
+        GIT_SHA: ${GIT_SHA}
+    ports:
+      - "127.0.0.1:8000:8000"
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]

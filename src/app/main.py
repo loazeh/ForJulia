@@ -1,5 +1,6 @@
 """Validated FastAPI interface to the trained churn pipeline."""
 
+import json
 import os
 from contextlib import asynccontextmanager
 from hashlib import sha256
@@ -23,6 +24,8 @@ async def lifespan(app: FastAPI):
     model_bytes = path.read_bytes()
     app.state.model = joblib.load(BytesIO(model_bytes))
     app.state.model_sha256 = sha256(model_bytes).hexdigest()
+    metadata = path.parent / "metadata.json"
+    app.state.lineage = json.loads(metadata.read_text()) if metadata.exists() else {}
     yield
 
 
@@ -52,7 +55,7 @@ class Prediction(BaseModel):
 
 @app.get("/health")
 def health(request: Request):
-    return {"status": "ok", "model_sha256": request.app.state.model_sha256}
+    return {"status": "ok", "model_sha256": request.app.state.model_sha256, **request.app.state.lineage}
 
 
 @app.post("/predict", response_model=Prediction)

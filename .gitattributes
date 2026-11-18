@@ -1,0 +1,4 @@
+.gitattributes export-ignore
+*.sh text eol=lf
+*.yml text eol=lf
+*.py text eol=lf
