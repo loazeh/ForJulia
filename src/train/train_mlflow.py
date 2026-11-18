@@ -106,12 +106,13 @@ def main() -> None:
             }
             for value in X_te[SLICE_COLUMN].unique():
                 mask = (X_te[SLICE_COLUMN] == value).to_numpy()
+                metrics[f"count_{SLICE_COLUMN}_{value}"] = int(mask.sum())
                 metrics[f"f1_{SLICE_COLUMN}_{value}"] = f1_score(y_te[mask], pred[mask], zero_division=0)
             mlflow.log_metrics({k: round(float(v), 4) for k, v in metrics.items()})
 
             # the model, with its signature (inputs and outputs) and an example row
             signature = infer_signature(X_te, proba)
-            info = mlflow.sklearn.log_model(model, name="model", signature=signature, input_example=X_te.head(3))
+            info = mlflow.sklearn.log_model(model, name="model", signature=signature, input_example=X_te.head(3), pyfunc_predict_fn="predict_proba")
             mlflow.set_tag("model_uri", info.model_uri)
 
             print(f"{name:18s} run {run.info.run_id[:8]}  auc {metrics['auc']:.3f}  f1 {metrics['f1']:.3f}  "
@@ -122,4 +123,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
