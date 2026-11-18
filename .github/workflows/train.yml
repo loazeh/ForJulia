@@ -60,8 +60,6 @@ jobs:
             echo "To record a promotion, commit \`artifacts/champion.json\`, \`artifacts/metadata.json\` and \`artifacts/model.joblib\` from your own run of \`scripts/promote.py\`."
           } >> "$GITHUB_STEP_SUMMARY"
 
-      # TODO (your work): after the gate passes on main, build the image (the Dockerfile packages artifacts/model.joblib),
-      # smoke-test it with scripts/smoke_test.sh, and deploy it. See Part 6 of the lab page for both options.
 
       - name: Build and smoke-test promoted candidate
         run: |
