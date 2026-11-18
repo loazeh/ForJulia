@@ -24,7 +24,6 @@ import numpy as np
 import pandas as pd
 from mlflow.models import infer_signature
 from sklearn.compose import ColumnTransformer
-from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import f1_score, roc_auc_score
 from sklearn.model_selection import train_test_split
@@ -50,10 +49,11 @@ def preprocessing() -> ColumnTransformer:
 
 # TODO 1: choose at least three candidates and justify them in MODEL_SELECTION.md.
 # Change the settings, not just the names: a different model family or a clearly different setting each time.
+# Deliberately excessive regularization: demonstration of a blocked regression.
 CANDIDATES = {
-    "logreg": LogisticRegression(C=1.0, max_iter=1000, random_state=42),
-    "random_forest": RandomForestClassifier(n_estimators=150, max_depth=6, min_samples_leaf=4, random_state=42),
-    "gradient_boosting": GradientBoostingClassifier(n_estimators=120, learning_rate=0.05, max_depth=2, random_state=42),
+    "weak_c_1e6": LogisticRegression(C=0.000001, max_iter=1000, random_state=42),
+    "weak_c_1e7": LogisticRegression(C=0.0000001, max_iter=1000, random_state=42),
+    "weak_c_1e8": LogisticRegression(C=0.00000001, max_iter=1000, random_state=42),
 }
 
 
