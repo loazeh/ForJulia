@@ -11,8 +11,17 @@ from src.train.train import ROOT, train
 
 
 @pytest.fixture(scope="session", autouse=True)
-def trained_model():
-    train()
+def trained_model(tmp_path_factory):
+    import os
+    directory = tmp_path_factory.mktemp("baseline")
+    train(output_dir=directory)
+    previous = os.environ.get("MODEL_PATH")
+    os.environ["MODEL_PATH"] = str(directory / "model.joblib")
+    yield directory
+    if previous is None:
+        os.environ.pop("MODEL_PATH", None)
+    else:
+        os.environ["MODEL_PATH"] = previous
 
 
 @pytest.fixture
@@ -26,12 +35,12 @@ def customer():
     return json.loads((ROOT / "sample_request.json").read_text())
 
 
-def test_health_proves_model_loaded(client):
+def test_health_proves_model_loaded(client, trained_model):
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json() == {
         "status": "ok",
-        "model_sha256": sha256((ROOT / "artifacts/model.joblib").read_bytes()).hexdigest(),
+        "model_sha256": sha256((trained_model / "model.joblib").read_bytes()).hexdigest(),
     }
 
 
@@ -75,9 +84,9 @@ def test_deterministic_known_prediction(client, customer):
         assert client.post("/predict", json=customer).json() == {"churn_probability": 0.895}
 
 
-def test_retraining_reproduces_predictions(tmp_path, customer):
+def test_retraining_reproduces_predictions(tmp_path, customer, trained_model):
     train(output_dir=tmp_path)
-    original = joblib.load(ROOT / "artifacts/model.joblib")
+    original = joblib.load(trained_model / "model.joblib")
     rebuilt = joblib.load(tmp_path / "model.joblib")
     frame = pd.DataFrame([customer])
     assert original.predict_proba(frame) == pytest.approx(rebuilt.predict_proba(frame), abs=1e-12)

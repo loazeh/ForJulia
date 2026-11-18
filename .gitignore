@@ -5,3 +5,9 @@ __pycache__/
 artifacts/
 *.log
 .env
+
+!artifacts/
+artifacts/*
+!artifacts/champion.json
+!artifacts/metadata.json
+!artifacts/model.joblib
